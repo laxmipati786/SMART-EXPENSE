@@ -3,7 +3,7 @@ import api from '../api/axios';
 
 const CATEGORIES = ['Overall', 'Food', 'Transport', 'Shopping', 'Rent', 'Entertainment', 'Health', 'Education', 'Utilities', 'Other'];
 
-const BudgetAlerts = () => {
+const BudgetAlerts = ({ transactions }) => {
     const [budgets, setBudgets] = useState([]);
     const [showForm, setShowForm] = useState(false);
     const [category, setCategory] = useState('Overall');
@@ -13,7 +13,7 @@ const BudgetAlerts = () => {
 
     useEffect(() => {
         fetchBudgets();
-    }, []);
+    }, [transactions]);
 
     const fetchBudgets = async () => {
         try {
