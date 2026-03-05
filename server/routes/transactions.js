@@ -138,17 +138,21 @@ async function checkBudgetAlerts(userId, userEmail, userName) {
             console.log(`🚨 Budget alert triggered! ${budget.category}: ${percentage.toFixed(1)}% (₹${spent} / ₹${budget.limit})`);
 
             try {
-                await sendBudgetAlert(userEmail, userName, {
+                const emailResult = await sendBudgetAlert(userEmail, userName, {
                     category: budget.category,
                     limit: budget.limit,
                     spent,
                     percentage: percentage.toFixed(1)
                 });
-                console.log(`📧 Budget alert email sent to ${userEmail} for ${budget.category}`);
 
-                // Mark alert as sent so we don't spam
-                budget.alertSent = true;
-                await budget.save();
+                if (emailResult && !emailResult.success) {
+                    console.error('📧 Email send failed inside transaction:', emailResult.error);
+                } else {
+                    console.log(`📧 Budget alert email sent to ${userEmail} for ${budget.category}`);
+                    // Mark alert as sent so we don't spam
+                    budget.alertSent = true;
+                    await budget.save();
+                }
             } catch (emailErr) {
                 console.error('📧 Email send failed:', emailErr.message);
             }

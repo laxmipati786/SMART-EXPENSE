@@ -158,16 +158,21 @@ router.post('/check-alerts', async (req, res) => {
 
                 // Send email
                 try {
-                    await sendBudgetAlert(req.user.email, req.user.name, {
+                    const emailResult = await sendBudgetAlert(req.user.email, req.user.name, {
                         category: budget.category,
                         limit: budget.limit,
                         spent,
                         percentage: percentage.toFixed(1)
                     });
-                    budget.alertSent = true;
-                    await budget.save();
+
+                    if (emailResult && !emailResult.success) {
+                        console.error('Email send failed:', emailResult.error);
+                    } else {
+                        budget.alertSent = true;
+                        await budget.save();
+                    }
                 } catch (emailErr) {
-                    console.error('Email send failed:', emailErr.message);
+                    console.error('Email send exception:', emailErr.message);
                 }
             }
         }
