@@ -21,27 +21,33 @@ const nodemailer = require('nodemailer');
  *   3. Use that 16-char password as EMAIL_PASS
  */
 const createTransporter = () => {
-    const { EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS } = process.env;
+  const { EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS } = process.env;
 
-    // Validate all required credentials exist
-    if (!EMAIL_HOST || !EMAIL_USER || !EMAIL_PASS) {
-        console.warn('⚠️  Email not configured — EMAIL_HOST, EMAIL_USER, or EMAIL_PASS missing in .env');
-        return null;
-    }
+  // Validate all required credentials exist
+  if (!EMAIL_HOST || !EMAIL_USER || !EMAIL_PASS) {
+    console.warn('⚠️  Email not configured — EMAIL_HOST, EMAIL_USER, or EMAIL_PASS missing in .env');
+    return null;
+  }
 
-    return nodemailer.createTransport({
-        host: EMAIL_HOST,
-        port: parseInt(EMAIL_PORT || '587'),
-        secure: parseInt(EMAIL_PORT || '587') === 465, // SSL for port 465, STARTTLS for 587
-        auth: {
-            user: EMAIL_USER,
-            pass: EMAIL_PASS,
-        },
-        // Connection pooling for better performance
-        pool: true,
-        maxConnections: 3,
-        maxMessages: 100,
-    });
+  return nodemailer.createTransport({
+    host: EMAIL_HOST,
+    port: parseInt(EMAIL_PORT || '465'),
+    secure: parseInt(EMAIL_PORT || '465') === 465, // True for 465
+    auth: {
+      user: EMAIL_USER,
+      pass: EMAIL_PASS,
+    },
+    // Force IPv4 to prevent Render timeout/unreachable errors
+    family: 4,
+    tls: {
+      // Do not fail on invalid certs in cloud free tiers
+      rejectUnauthorized: false
+    },
+    // Connection pooling
+    pool: true,
+    maxConnections: 3,
+    maxMessages: 100,
+  });
 };
 
 // Singleton transporter — created once, reused across requests
@@ -52,10 +58,10 @@ let transporter = null;
  * @returns {Object|null} Nodemailer transporter or null
  */
 const getTransporter = () => {
-    if (!transporter) {
-        transporter = createTransporter();
-    }
-    return transporter;
+  if (!transporter) {
+    transporter = createTransporter();
+  }
+  return transporter;
 };
 
 // ==========================================================
@@ -77,38 +83,38 @@ const getTransporter = () => {
  *   await sendEmail('user@example.com', 'Hello!', 'Fallback', '<h1>HTML Body</h1>');
  */
 const sendEmail = async (to, subject, text, html = null) => {
-    const emailTransporter = getTransporter();
+  const emailTransporter = getTransporter();
 
-    // If SMTP not configured, log to console (development fallback)
-    if (!emailTransporter) {
-        console.log('═══════════════════════════════════════════');
-        console.log('📧 [MOCK EMAIL] — SMTP not configured');
-        console.log(`   To:      ${to}`);
-        console.log(`   Subject: ${subject}`);
-        console.log(`   Body:    ${text.substring(0, 200)}...`);
-        console.log('═══════════════════════════════════════════');
-        return { success: true, messageId: null, mock: true };
-    }
+  // If SMTP not configured, log to console (development fallback)
+  if (!emailTransporter) {
+    console.log('═══════════════════════════════════════════');
+    console.log('📧 [MOCK EMAIL] — SMTP not configured');
+    console.log(`   To:      ${to}`);
+    console.log(`   Subject: ${subject}`);
+    console.log(`   Body:    ${text.substring(0, 200)}...`);
+    console.log('═══════════════════════════════════════════');
+    return { success: true, messageId: null, mock: true };
+  }
 
-    try {
-        // Send the email
-        const info = await emailTransporter.sendMail({
-            from: `"ExpenseAI" <${process.env.EMAIL_USER}>`,
-            to,
-            subject,
-            text,       // Plain text fallback
-            ...(html && { html }), // HTML body if provided
-        });
+  try {
+    // Send the email
+    const info = await emailTransporter.sendMail({
+      from: `"ExpenseAI" <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      text,       // Plain text fallback
+      ...(html && { html }), // HTML body if provided
+    });
 
-        console.log(`✅ Email sent successfully to ${to} — MessageID: ${info.messageId}`);
-        return { success: true, messageId: info.messageId, mock: false };
-    } catch (error) {
-        console.error(`❌ Email failed to ${to}:`, error.message);
+    console.log(`✅ Email sent successfully to ${to} — MessageID: ${info.messageId}`);
+    return { success: true, messageId: info.messageId, mock: false };
+  } catch (error) {
+    console.error(`❌ Email failed to ${to}:`, error.message);
 
-        // Don't throw — email failure shouldn't crash the app
-        // Log the error and return failure status
-        return { success: false, messageId: null, mock: false, error: error.message };
-    }
+    // Don't throw — email failure shouldn't crash the app
+    // Log the error and return failure status
+    return { success: false, messageId: null, mock: false, error: error.message };
+  }
 };
 
 // ==========================================================
@@ -122,13 +128,13 @@ const sendEmail = async (to, subject, text, html = null) => {
  * @param {string} name — User's display name
  */
 const sendWelcomeEmail = async (to, name) => {
-    const subject = '🎉 Welcome to Smart Expense Tracker!';
+  const subject = '🎉 Welcome to Smart Expense Tracker!';
 
-    // Plain text version
-    const text = `Hello ${name},\n\nWelcome to Smart Expense Tracker! Your account has been successfully created.\n\nYou can now:\n- Track your income and expenses\n- Set monthly budgets with alerts\n- Get AI-powered financial insights\n- Export PDF & CSV reports\n\nStart managing your finances smartly!\n\n— The ExpenseAI Team`;
+  // Plain text version
+  const text = `Hello ${name},\n\nWelcome to Smart Expense Tracker! Your account has been successfully created.\n\nYou can now:\n- Track your income and expenses\n- Set monthly budgets with alerts\n- Get AI-powered financial insights\n- Export PDF & CSV reports\n\nStart managing your finances smartly!\n\n— The ExpenseAI Team`;
 
-    // Styled HTML version
-    const html = `
+  // Styled HTML version
+  const html = `
     <div style="font-family: 'Inter', 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0f0f23; color: #e2e8f0; border-radius: 16px; overflow: hidden; border: 1px solid rgba(99, 102, 241, 0.15);">
       <!-- Header -->
       <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 40px 30px; text-align: center;">
@@ -149,11 +155,11 @@ const sendWelcomeEmail = async (to, name) => {
         <!-- Feature cards -->
         <div style="margin-bottom: 24px;">
           ${[
-            { emoji: '💰', title: 'Track Expenses', desc: 'Log income & expenses with smart categorization' },
-            { emoji: '🎯', title: 'Budget Alerts', desc: 'Set limits and get email alerts when you overspend' },
-            { emoji: '🤖', title: 'AI Insights', desc: 'Get personalized financial advice powered by GPT' },
-            { emoji: '📊', title: 'Visual Analytics', desc: 'Beautiful charts showing your spending patterns' },
-        ].map(f => `
+      { emoji: '💰', title: 'Track Expenses', desc: 'Log income & expenses with smart categorization' },
+      { emoji: '🎯', title: 'Budget Alerts', desc: 'Set limits and get email alerts when you overspend' },
+      { emoji: '🤖', title: 'AI Insights', desc: 'Get personalized financial advice powered by GPT' },
+      { emoji: '📊', title: 'Visual Analytics', desc: 'Beautiful charts showing your spending patterns' },
+    ].map(f => `
             <div style="display: flex; align-items: center; gap: 14px; padding: 14px; margin-bottom: 8px; background: rgba(99, 102, 241, 0.06); border-radius: 12px; border-left: 3px solid #6366f1;">
               <span style="font-size: 24px;">${f.emoji}</span>
               <div>
@@ -181,7 +187,7 @@ const sendWelcomeEmail = async (to, name) => {
     </div>
   `;
 
-    return await sendEmail(to, subject, text, html);
+  return await sendEmail(to, subject, text, html);
 };
 
 /**
@@ -192,18 +198,18 @@ const sendWelcomeEmail = async (to, name) => {
  * @param {Object} budgetData — { category, limit, spent, percentage }
  */
 const sendBudgetAlert = async (to, name, budgetData) => {
-    const { category, limit, spent, percentage } = budgetData;
-    const isOver = parseFloat(percentage) >= 100;
+  const { category, limit, spent, percentage } = budgetData;
+  const isOver = parseFloat(percentage) >= 100;
 
-    const subject = isOver
-        ? `🚨 Budget Exceeded: ${category} spending at ${percentage}%!`
-        : `⚠️ Budget Alert: ${category} spending at ${percentage}%`;
+  const subject = isOver
+    ? `🚨 Budget Exceeded: ${category} spending at ${percentage}%!`
+    : `⚠️ Budget Alert: ${category} spending at ${percentage}%`;
 
-    // Plain text version
-    const text = `Hello ${name},\n\n${isOver ? 'You have EXCEEDED' : 'You are approaching'} your monthly ${category} budget!\n\nSpent: ₹${spent}\nBudget Limit: ₹${limit}\nUsage: ${percentage}%\n\nConsider reviewing your ${category.toLowerCase()} expenses and see where you can cut back.\n\n— ExpenseAI Budget Alerts`;
+  // Plain text version
+  const text = `Hello ${name},\n\n${isOver ? 'You have EXCEEDED' : 'You are approaching'} your monthly ${category} budget!\n\nSpent: ₹${spent}\nBudget Limit: ₹${limit}\nUsage: ${percentage}%\n\nConsider reviewing your ${category.toLowerCase()} expenses and see where you can cut back.\n\n— ExpenseAI Budget Alerts`;
 
-    // Styled HTML version
-    const html = `
+  // Styled HTML version
+  const html = `
     <div style="font-family: 'Inter', 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0f0f23; color: #e2e8f0; border-radius: 16px; overflow: hidden; border: 1px solid ${isOver ? 'rgba(244, 63, 94, 0.2)' : 'rgba(249, 115, 22, 0.2)'};">
       <!-- Header -->
       <div style="background: linear-gradient(135deg, ${isOver ? '#e11d48, #f43f5e' : '#ea580c, #f97316'}); padding: 35px 30px; text-align: center;">
@@ -223,9 +229,9 @@ const sendBudgetAlert = async (to, name, budgetData) => {
         </p>
         <p style="font-size: 15px; margin: 0 0 24px; color: #aaaac0; line-height: 1.6;">
           ${isOver
-            ? `You have <strong style="color: #fb7185;">exceeded</strong> your monthly <strong style="color: #e2e8f0;">${category}</strong> spending limit.`
-            : `You are approaching your monthly <strong style="color: #e2e8f0;">${category}</strong> spending limit.`
-        }
+      ? `You have <strong style="color: #fb7185;">exceeded</strong> your monthly <strong style="color: #e2e8f0;">${category}</strong> spending limit.`
+      : `You are approaching your monthly <strong style="color: #e2e8f0;">${category}</strong> spending limit.`
+    }
         </p>
 
         <!-- Budget Stats Card -->
@@ -281,7 +287,7 @@ const sendBudgetAlert = async (to, name, budgetData) => {
     </div>
   `;
 
-    return await sendEmail(to, subject, text, html);
+  return await sendEmail(to, subject, text, html);
 };
 
 /**
@@ -292,11 +298,11 @@ const sendBudgetAlert = async (to, name, budgetData) => {
  * @param {Object} summary — { income, expense, balance, topCategory, topAmount, month }
  */
 const sendMonthlySummary = async (to, name, summary) => {
-    const subject = `📊 Your ${summary.month} Financial Summary`;
+  const subject = `📊 Your ${summary.month} Financial Summary`;
 
-    const text = `Hello ${name},\n\nHere's your ${summary.month} financial summary:\n\nIncome: ₹${summary.income}\nExpenses: ₹${summary.expense}\nNet Balance: ₹${summary.balance}\nTop Category: ${summary.topCategory} (₹${summary.topAmount})\n\n— ExpenseAI`;
+  const text = `Hello ${name},\n\nHere's your ${summary.month} financial summary:\n\nIncome: ₹${summary.income}\nExpenses: ₹${summary.expense}\nNet Balance: ₹${summary.balance}\nTop Category: ${summary.topCategory} (₹${summary.topAmount})\n\n— ExpenseAI`;
 
-    const html = `
+  const html = `
     <div style="font-family: 'Inter', 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0f0f23; color: #e2e8f0; border-radius: 16px; overflow: hidden; border: 1px solid rgba(99, 102, 241, 0.15);">
       <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 35px 30px; text-align: center;">
         <div style="font-size: 42px; margin-bottom: 10px;">📊</div>
@@ -331,34 +337,34 @@ const sendMonthlySummary = async (to, name, summary) => {
     </div>
   `;
 
-    return await sendEmail(to, subject, text, html);
+  return await sendEmail(to, subject, text, html);
 };
 
 // ==========================================================
 // Verify transporter on startup (non-blocking)
 // ==========================================================
 const verifyEmailConnection = async () => {
-    const emailTransporter = getTransporter();
-    if (!emailTransporter) {
-        console.log('📧 Email: Running in MOCK mode (configure EMAIL_* env vars for live emails)');
-        return;
-    }
-    try {
-        await emailTransporter.verify();
-        console.log('✅ Email: SMTP connection verified — emails are live!');
-    } catch (error) {
-        console.error('❌ Email: SMTP verification failed —', error.message);
-        console.log('   Check EMAIL_HOST, EMAIL_USER, EMAIL_PASS in your .env');
-    }
+  const emailTransporter = getTransporter();
+  if (!emailTransporter) {
+    console.log('📧 Email: Running in MOCK mode (configure EMAIL_* env vars for live emails)');
+    return;
+  }
+  try {
+    await emailTransporter.verify();
+    console.log('✅ Email: SMTP connection verified — emails are live!');
+  } catch (error) {
+    console.error('❌ Email: SMTP verification failed —', error.message);
+    console.log('   Check EMAIL_HOST, EMAIL_USER, EMAIL_PASS in your .env');
+  }
 };
 
 // ==========================================================
 // Exports
 // ==========================================================
 module.exports = {
-    sendEmail,           // Core reusable function
-    sendWelcomeEmail,    // Welcome email on signup
-    sendBudgetAlert,     // Budget threshold alert
-    sendMonthlySummary,  // Monthly expense summary
-    verifyEmailConnection, // Verify SMTP on startup
+  sendEmail,           // Core reusable function
+  sendWelcomeEmail,    // Welcome email on signup
+  sendBudgetAlert,     // Budget threshold alert
+  sendMonthlySummary,  // Monthly expense summary
+  verifyEmailConnection, // Verify SMTP on startup
 };
